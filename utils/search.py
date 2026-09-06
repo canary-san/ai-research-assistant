@@ -65,5 +65,5 @@ completion = client.beta.chat.completions.parse(
     max_tokens=1000,
 )
 
-response = completion.choices[0].message.parsed
-print(response)
+search_text = completion.choices[0].message.parsed
+print(search_text)
