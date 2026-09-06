@@ -1,17 +1,9 @@
-import logging
 import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
 from tavily import TavilyClient
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -33,12 +25,12 @@ print("Client created successfully!")
 
 tavily_client = TavilyClient(api_key=os.getenv("TAVILY-API-KEY"))
 
-search_results = tavily_client.search(query)
+search_results = tavily_client.search(query, max_results=5)
 
 print(search_results)
 
 search_text = "\n".join(
-    f"Title: {result['title']}\nURL: {result['url']}\nContent: {result['content']}\n"
+    f"Title: {result['title']}\nURL: {result['url']}\nContent: {result['content'][:2000]}\n"
     for result in search_results["results"]
 )
 
