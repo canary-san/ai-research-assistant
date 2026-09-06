@@ -19,12 +19,10 @@ print("Key length:", len(key) if key else 0)
 print("Base URL:", repr(base_url))
 
 client = OpenAI(api_key=key, base_url=base_url)
-
 print("Client created successfully!")
 
 
 tavily_client = TavilyClient(api_key=os.getenv("TAVILY-API-KEY"))
-
 search_results = tavily_client.search(query, max_results=5)
 
 print(search_results)
@@ -33,6 +31,7 @@ search_text = "\n".join(
     f"Title: {result['title']}\nURL: {result['url']}\nContent: {result['content'][:2000]}\n"
     for result in search_results["results"]
 )
+print(search_text)
 
 
 class SearchResults(BaseModel):
@@ -72,5 +71,10 @@ completion = client.beta.chat.completions.parse(
     max_tokens=1000,
 )
 
-search_text = completion.choices[0].message.parsed
-print(search_text)
+response = completion.choices[0].message.parsed
+print(response.answer)
+
+print("\nSOURCES:")
+for source in response.sources:
+    print(f"- {source.title}")
+    print(f"  {source.url}")
