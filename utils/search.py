@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 
@@ -7,11 +6,20 @@ from openai import OpenAI
 from pydantic import BaseModel
 from tavily import TavilyClient
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 key = os.getenv("GEMINI_API_KEY")
 base_url = os.getenv("GEMINI_BASE_URL")
 model = "gemini-3.5-flash"
+query = "what is json ?"
+
 
 print("Key exists:", key is not None)
 print("Key empty:", key == "")
@@ -25,7 +33,7 @@ print("Client created successfully!")
 
 tavily_client = TavilyClient(api_key=os.getenv("TAVILY-API-KEY"))
 
-search_results = tavily_client.search("what is json?")
+search_results = tavily_client.search(query)
 
 print(search_results)
 
@@ -50,15 +58,21 @@ messages = [
     {
         "role": "system",
         "content": """
-        You are an AI research assistant.
-        Analyze the provided search results and extract the information relevant to the user's question.
-        Be accurate, concise, and do not invent information.
-        Separate facts from uncertainty.
-        """,
+You are an AI research assistant.
+Use the provided search results to answer the user's question.
+Be accurate, concise, and do not invent information.
+""",
     },
-    {"role": "user", "content": json.dumps(search_results)},
-]
+    {
+        "role": "user",
+        "content": f"""
+Question: {query}
 
+Search results:
+{search_text}
+""",
+    },
+]
 completion = client.beta.chat.completions.parse(
     model=model,
     messages=messages,
