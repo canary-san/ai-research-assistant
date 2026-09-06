@@ -7,9 +7,9 @@ from tavily import TavilyClient
 
 load_dotenv()
 
-key = os.getenv("GEMINI_API_KEY")
-base_url = os.getenv("GEMINI_BASE_URL")
-model = "gemini-3.5-flash"
+key = os.getenv("GROQ_API_KEY")
+base_url = os.getenv("GROQ_BASE_URL")
+model = os.getenv("GROQ_MODEL")
 query = "what is json ?"
 
 
