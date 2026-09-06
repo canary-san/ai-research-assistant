@@ -24,17 +24,17 @@ print("Client created successfully!")
 
 tavily_client = TavilyClient(api_key=os.getenv("TAVILY-API-KEY"))
 
-response = tavily_client.search("what is json?")
+search_results = tavily_client.search("what is json?")
 
-print(response)
+print(search_results)
 
 search_text = "\n".join(
     f"Title: {result['title']}\nURL: {result['url']}\nContent: {result['content']}\n"
-    for result in response["results"]
+    for result in search_results["results"]
 )
 
 
-class SearchResult(BaseModel):
+class SearchResults(BaseModel):
     title: str
     url: str
     snippet: str
@@ -42,7 +42,7 @@ class SearchResult(BaseModel):
 
 class ResearchResponse(BaseModel):
     answer: str
-    sources: list[SearchResult]
+    sources: list[SearchResults]
 
 
 messages = [
@@ -55,7 +55,7 @@ messages = [
         Separate facts from uncertainty.
         """,
     },
-    {"role": "user", "content": json.dumps(response)},
+    {"role": "user", "content": json.dumps(search_results)},
 ]
 
 completion = client.beta.chat.completions.parse(
@@ -65,5 +65,5 @@ completion = client.beta.chat.completions.parse(
     max_tokens=1000,
 )
 
-result = completion.choices[0].message.parsed
-print(result)
+response = completion.choices[0].message.parsed
+print(response)
