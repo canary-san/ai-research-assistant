@@ -11,8 +11,7 @@ load_dotenv()
 key = os.getenv("GROQ_API_KEY")
 base_url = os.getenv("GROQ_BASE_URL")
 model = os.getenv("GROQ_MODEL")
-query = "what is json ?"
-
+query = "what are the best phones under 2000 dollars in 2026 ?"
 
 print("Key exists:", key is not None)
 print("Key empty:", key == "")
@@ -36,25 +35,27 @@ def search_web(query):
 
 available_tools = {"search_web": search_web}
 
-tools = {
-    "type": "function",
-    "function": {
-        "name": "search_web",
-        "description": "Search the web for answers to the query.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query to search the web for.",
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_web",
+            "description": "Search the web for answers to the query.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query to search the web for.",
+                    },
                 },
+                "required": ["query"],
+                "additionalProperties": False,
             },
-            "required": ["query"],
-            "additionalProperties": False,
         },
-    },
-}
+    }
+]
 
 messages = [
     {
@@ -65,15 +66,7 @@ Use the provided search results to answer the user's question.
 Be accurate, concise, and do not invent information.
 """,
     },
-    {
-        "role": "user",
-        "content": f"""
-Question: {query}
-
-Search results:
-{search_web(query)}
-""",
-    },
+    {"role": "user", "content": query},
 ]
 
 completion = client.beta.chat.completions.create(
@@ -83,13 +76,27 @@ completion = client.beta.chat.completions.create(
     max_tokens=1000,
 )
 
-response = completion.choices[0].message
-print(response.answer)
+message = completion.choices[0].message
 
-print("\nSOURCES:")
-for source in response.sources:
-    print(f"- {source.title}")
-    print(f"  {source.url}")
+if message.tool_calls:
+    messages.append(message)
+
+    for tool_call in message.tool_calls:
+        function_name = tool_call.function.name
+        function = available_tools.get(function_name)
+        if function is None:
+            print(f"unknown tool: {function_name}")
+            continue
+
+        arguments = json.loads(tool_call.function.arguments)
+        result = function(**arguments)
+
+        messages.append(
+            {"role": "tool", "tool_call_id": tool_call.id, "content": result}
+        )
+
+        print("TOOL RESULT:")
+        print(result)
 
 
 class SearchResults(BaseModel):
@@ -101,3 +108,18 @@ class SearchResults(BaseModel):
 class ResearchResponse(BaseModel):
     answer: str
     sources: list[SearchResults]
+
+
+completion = client.beta.chat.completions.parse(
+    model=model,
+    messages=messages,
+    response_format=ResearchResponse,
+    max_tokens=1000,
+)
+response = completion.choices[0].message.parsed
+
+
+print("\nSOURCES:")
+for source in message.sources:
+    print(f"- {source.title}")
+    print(f"  {source.url}")
