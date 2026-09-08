@@ -50,15 +50,14 @@ response = client.chat.completions.create(
 
 message = response.choices[0].message
 
-print(message)
-
 if message.tool_calls:
+    messages.append(message)
+
     for tool_call in message.tool_calls:
         if tool_call.function.name == "get_weather":
             arguments = json.loads(tool_call.function.arguments)
             result = get_weather(arguments["city"])
 
-            messages.append(message)
             messages.append(
                 {"role": "tool", "tool_call_id": tool_call.id, "content": result}
             )
@@ -74,4 +73,7 @@ response = client.chat.completions.create(
     max_tokens=1000,
 )
 
-message = response.choices[0], message
+message = response.choices[0].message
+
+print("MODEL REQUESTED:")
+print(message.tool_calls)
