@@ -111,10 +111,7 @@ class ResearchResponse(BaseModel):
 
 
 completion = client.beta.chat.completions.parse(
-    model=model,
-    messages=messages,
-    response_format=ResearchResponse,
-    max_tokens=1000,
+    model=model, messages=messages, response_format=ResearchResponse, max_tokens=2000
 )
 response = completion.choices[0].message.parsed
 
