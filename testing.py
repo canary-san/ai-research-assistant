@@ -76,7 +76,10 @@ if message.tool_calls:
 
     for tool_call in message.tool_calls:
         function_name = tool_call.function.name
-        function = available_tools[function_name]
+        function = available_tools.get(function_name)
+        if function is None:
+            print(f"unknown tool: {function_name}")
+            continue
 
         arguments = json.loads(tool_call.function.arguments)
         result = function(**arguments)
@@ -98,5 +101,4 @@ response = client.chat.completions.create(
 
 message = response.choices[0].message
 
-print("MODEL REQUESTED:")
-print(message.tool_calls)
+print(message.content)

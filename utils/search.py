@@ -23,28 +23,38 @@ client = OpenAI(api_key=key, base_url=base_url)
 print("Client created successfully!")
 
 
-tavily_client = TavilyClient(api_key=os.getenv("TAVILY-API-KEY"))
-search_results = tavily_client.search(query, max_results=5)
+def search_web(query):
+    tavily_client = TavilyClient(api_key=os.getenv("TAVILY-API-KEY"))
+    search_results = tavily_client.search(query, max_results=5)
 
-print(search_results)
-
-search_text = "\n".join(
-    f"Title: {result['title']}\nURL: {result['url']}\nContent: {result['content'][:2000]}\n"
-    for result in search_results["results"]
-)
-print(search_text)
-
-
-class SearchResults(BaseModel):
-    title: str
-    url: str
-    snippet: str
+    search_text = "\n".join(
+        f"Title: {result['title']}\nURL: {result['url']}\nContent: {result['content'][:2000]}\n"
+        for result in search_results["results"]
+    )
+    return search_text
 
 
-class ResearchResponse(BaseModel):
-    answer: str
-    sources: list[SearchResults]
+available_tools = {"search_web": search_web}
 
+tools = {
+    "type": "function",
+    "function": {
+        "name": "search_web",
+        "description": "Search the web for answers to the query.",
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query to search the web for.",
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 messages = [
     {
@@ -61,21 +71,33 @@ Be accurate, concise, and do not invent information.
 Question: {query}
 
 Search results:
-{search_text}
+{search_web(query)}
 """,
     },
 ]
-completion = client.beta.chat.completions.parse(
+
+completion = client.beta.chat.completions.create(
     model=model,
     messages=messages,
-    response_format=ResearchResponse,
+    tools=tools,
     max_tokens=1000,
 )
 
-response = completion.choices[0].message.parsed
+response = completion.choices[0].message
 print(response.answer)
 
 print("\nSOURCES:")
 for source in response.sources:
     print(f"- {source.title}")
     print(f"  {source.url}")
+
+
+class SearchResults(BaseModel):
+    title: str
+    url: str
+    snippet: str
+
+
+class ResearchResponse(BaseModel):
+    answer: str
+    sources: list[SearchResults]
