@@ -24,7 +24,7 @@ nest_asyncio.apply()
 key = os.getenv("GROQ_API_KEY")
 base_url = os.getenv("GROQ_BASE_URL")
 model = os.getenv("GROQ_MODEL")
-query = "what are the best phones under 2000 dollars in 2026 ?"
+question = "what are the best phones under 2000 dollars in 2026 ?"
 
 print("Key exists:", key is not None)
 print("Key empty:", key == "")
@@ -39,10 +39,10 @@ print("Client created successfully!")
 # ------------------------------------------------------------
 # 2) Function tool: search the web
 # ------------------------------------------------------------
-async def search_web(query):
+async def search_web(question):
     # Tavily is used to retrieve fresh live search results.
     tavily_client = TavilyClient(api_key=os.getenv("TAVILY-API-KEY"))
-    search_results = await tavily_client.async_search(query, max_results=5)
+    search_results = await tavily_client.async_search(question, max_results=5)
 
     # Keep only the most useful parts of each result so the model
     # has readable context to work with.
@@ -69,12 +69,12 @@ tools = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
+                    "question": {
                         "type": "string",
-                        "description": "The search query to search the web for.",
+                        "description": "The search question to search the web for.",
                     },
                 },
-                "required": ["query"],
+                "required": ["question"],
                 "additionalProperties": False,
             },
         },
@@ -93,7 +93,7 @@ Use the provided search results to answer the user's question.
 Be accurate, concise, and do not invent information.
 """,
     },
-    {"role": "user", "content": query},
+    {"role": "user", "content": question},
 ]
 
 # Ask the model to respond to the query and decide whether it needs to
@@ -170,3 +170,13 @@ for source in response.sources:
     print(f"- {source.title}")
     print(f"  {source.url}")
     print(f"  {source.snippet}")
+
+
+async def generate_queries(question: str) -> list[str]:
+    completion = await client.beta.chat.completions.parse(
+        model=model,
+        messages=messages,
+        response_format=QueryPlan,
+        max_tokens=3000,
+    )
+    return completion.choices[0].message.parsed.queries
