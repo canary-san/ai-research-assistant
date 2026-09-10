@@ -87,52 +87,91 @@ tools = [
 messages = [
     {
         "role": "system",
-        "content": """
-You are an AI research assistant.
-Use the provided search results to answer the user's question.
-Be accurate, concise, and do not invent information.
-""",
+        "content": (
+            "You are a search planner. Given a research question, generate "
+            "exactly 3 diverse, specific web search queries that together "
+            "would fully answer it. Each query must be self-contained."
+        ),
     },
     {"role": "user", "content": question},
 ]
 
-# Ask the model to respond to the query and decide whether it needs to
-# call the web-search tool before answering.
-completion = client.beta.chat.completions.create(
-    model=model,
-    messages=messages,
-    tools=tools,
-    max_tokens=1000,
-)
 
-message = completion.choices[0].message
+async def generate_queries(question: str) -> list[str]:
+    completion = await client.beta.chat.completions.parse(
+        model=model,
+        messages=messages,
+        response_format=QueryPlan,
+        max_tokens=3000,
+    )
+    queries = completion.choices[0].message.parsed.queries
+
+    messages.append(
+        {
+            "role": "assistant",
+            "content": f"generated search queries: {queries}",
+        }
+    )
+    return queries
+
+queries= generate_queries(question)
+
+# Ask the model to respond to the question.and decide whether it needs to
+# call the web-search tool before answering.
+async def check_search_needed(queries: list[str]):
+    messages.append(
+                    {
+                "role": "user",
+                "content": (
+                    "You are an AI research assistant. "
+                    "before answering. If current or external information is needed, "
+                    "use the web search tool."
+                    "\n".join(queries)
+                ),
+            },
+             
+        )
+    completion = await client.beta.chat.completions.create(
+        model=model,
+        messages=messages,
+        tools=tools,
+        max_tokens=2000,
+    )
+
+    message = completion.choices[0].message
+    return message
+
 
 # ------------------------------------------------------------
 # 5) Handle tool calls from the model
 # ------------------------------------------------------------
-if message.tool_calls:
-    # Add the model's tool call response to the conversation history.
-    messages.append(message)
+async def tool_call_handler():
 
-    # Run each tool call requested by the model.
-    for tool_call in message.tool_calls:
-        function_name = tool_call.function.name
-        function = available_tools.get(function_name)
-        if function is None:
-            print(f"unknown tool: {function_name}")
-            continue
+    message = messages.append()
 
-        # Parse the JSON arguments passed to the tool.
-        arguments = json.loads(tool_call.function.arguments)
-        result = function(**arguments)
+    if message.tool_calls:
+        # Add the model's tool call response to the conversation history.
+        messages.append(message)
 
-        # Add the tool result back into the chat so the model can use it.
-        messages.append(
-            {"role": "tool", "tool_call_id": tool_call.id, "content": result}
-        )
+        # Run each tool call requested by the model.
+        for tool_call in message.tool_calls:
+            function_name = tool_call.function.name
+            function = available_tools.get(function_name)
+            if function is None:
+                print(f"unknown tool: {function_name}")
+                continue
 
-        print("TOOL RESULT:")
-        print(result)
+            # Parse the JSON arguments passed to the tool.
+            arguments = json.loads(tool_call.function.arguments)
+            result = function(**arguments)
+
+            # Add the tool result back into the chat so the model can use it.
+            messages.append(
+                {"role": "tool", "tool_call_id": tool_call.id, "content": result}
+            )
+
+            print("TOOL RESULT:")
+            print(result)
 
 
 # ------------------------------------------------------------
@@ -170,23 +209,3 @@ for source in response.sources:
     print(f"- {source.title}")
     print(f"  {source.url}")
     print(f"  {source.snippet}")
-
-
-async def generate_queries(question: str) -> list[str]:
-    completion = await client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a search planner. Given a research question, generate "
-                    "exactly 3 diverse, specific web search queries that together "
-                    "would fully answer it. Each query must be self-contained."
-                ),
-            },
-            {"role": "user", "content": question},
-        ],
-        response_format=QueryPlan,
-        max_tokens=3000,
-    )
-    return completion.choices[0].message.parsed.queries
