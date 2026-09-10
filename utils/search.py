@@ -114,23 +114,24 @@ async def generate_queries(question: str) -> list[str]:
     )
     return queries
 
-queries= generate_queries(question)
+
+queries = generate_queries(question)
+
 
 # Ask the model to respond to the question.and decide whether it needs to
 # call the web-search tool before answering.
 async def check_search_needed(queries: list[str]):
     messages.append(
-                    {
-                "role": "user",
-                "content": (
-                    "You are an AI research assistant. "
-                    "before answering. If current or external information is needed, "
-                    "use the web search tool."
-                    "\n".join(queries)
-                ),
-            },
-             
-        )
+        {
+            "role": "user",
+            "content": (
+                "You are an AI research assistant. "
+                "before answering. If current or external information is needed, "
+                "use the web search tool."
+                "\n".join(queries)
+            ),
+        },
+    )
     completion = await client.beta.chat.completions.create(
         model=model,
         messages=messages,
@@ -145,9 +146,7 @@ async def check_search_needed(queries: list[str]):
 # ------------------------------------------------------------
 # 5) Handle tool calls from the model
 # ------------------------------------------------------------
-async def tool_call_handler():
-
-    message = messages.append()
+async def tool_call_handler(message):
 
     if message.tool_calls:
         # Add the model's tool call response to the conversation history.
@@ -163,7 +162,7 @@ async def tool_call_handler():
 
             # Parse the JSON arguments passed to the tool.
             arguments = json.loads(tool_call.function.arguments)
-            result = function(**arguments)
+            result = await function(**arguments)
 
             # Add the tool result back into the chat so the model can use it.
             messages.append(
@@ -172,6 +171,8 @@ async def tool_call_handler():
 
             print("TOOL RESULT:")
             print(result)
+
+            return messages
 
 
 # ------------------------------------------------------------
