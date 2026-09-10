@@ -175,7 +175,17 @@ for source in response.sources:
 async def generate_queries(question: str) -> list[str]:
     completion = await client.beta.chat.completions.parse(
         model=model,
-        messages=messages,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a search planner. Given a research question, generate "
+                    "exactly 3 diverse, specific web search queries that together "
+                    "would fully answer it. Each query must be self-contained."
+                ),
+            },
+            {"role": "user", "content": question},
+        ],
         response_format=QueryPlan,
         max_tokens=3000,
     )
