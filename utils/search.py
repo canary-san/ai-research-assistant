@@ -198,7 +198,7 @@ async def __main__():
     if response.tool_calls:
         await tool_call_handler(response)
 
-        completion = client.beta.chat.completions.parse(
+        completion = await client.beta.chat.completions.parse(
             model=model,
             messages=messages,
             response_format=ResearchResponse,
