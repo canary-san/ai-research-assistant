@@ -37,7 +37,25 @@ print("Client created successfully!")
 
 
 # ------------------------------------------------------------
-# 2) Function tool: search the web
+# 2) Structured output models for research answers
+# ------------------------------------------------------------
+class SearchResults(BaseModel):
+    title: str
+    url: str
+    snippet: str
+
+
+class ResearchResponse(BaseModel):
+    answer: str
+    sources: list[SearchResults]
+
+
+class QueryPlan(BaseModel):
+    queries: list[str]
+
+
+# ------------------------------------------------------------
+# 3) Function tool: search the web
 # ------------------------------------------------------------
 async def search_web(question):
     # Tavily is used to retrieve fresh live search results.
@@ -57,7 +75,7 @@ async def search_web(question):
 available_tools = {"search_web": search_web}
 
 # ------------------------------------------------------------
-# 3) Define the function-calling schema for the model
+# 4) Define the function-calling schema for the model
 # ------------------------------------------------------------
 tools = [
     {
@@ -82,7 +100,7 @@ tools = [
 ]
 
 # ------------------------------------------------------------
-# 4) Build the initial conversation for the model
+# 5) Build the initial conversation for the model
 # ------------------------------------------------------------
 messages = [
     {
@@ -106,54 +124,48 @@ async def generate_queries(question: str) -> list[str]:
     )
     queries = completion.choices[0].message.parsed.queries
 
-    messages.append(
-        {
-            "role": "assistant",
-            "content": f"generated search queries: {queries}",
-        }
-    )
     return queries
-
-
-queries = generate_queries(question)
 
 
 # Ask the model to respond to the question.and decide whether it needs to
 # call the web-search tool before answering.
 async def check_search_needed(queries: list[str]):
-    messages.append(
+    research_messages = [
         {
-            "role": "user",
+            "role": "system",
             "content": (
                 "You are an AI research assistant. "
-                "before answering. If current or external information is needed, "
-                "use the web search tool."
-                "\n".join(queries)
+                "Before answering, decide whether external information is needed. "
+                "If needed, use the web search tool."
             ),
         },
-    )
+        {
+            "role": "user",
+            "content": "\n".join(queries),
+        },
+    ]
     completion = await client.beta.chat.completions.create(
         model=model,
-        messages=messages,
+        messages=research_messages,
         tools=tools,
         max_tokens=2000,
     )
 
-    message = completion.choices[0].message
-    return message
+    response = completion.choices[0].message
+    return response
 
 
 # ------------------------------------------------------------
-# 5) Handle tool calls from the model
+# 6) Handle tool calls from the model
 # ------------------------------------------------------------
-async def tool_call_handler(message):
+async def tool_call_handler(response):
 
-    if message.tool_calls:
+    if response.tool_calls:
         # Add the model's tool call response to the conversation history.
-        messages.append(message)
+        messages.append(response)
 
         # Run each tool call requested by the model.
-        for tool_call in message.tool_calls:
+        for tool_call in response.tool_calls:
             function_name = tool_call.function.name
             function = available_tools.get(function_name)
             if function is None:
@@ -176,37 +188,37 @@ async def tool_call_handler(message):
 
 
 # ------------------------------------------------------------
-# 6) Structured output models for research answers
-# ------------------------------------------------------------
-class SearchResults(BaseModel):
-    title: str
-    url: str
-    snippet: str
-
-
-class ResearchResponse(BaseModel):
-    answer: str
-    sources: list[SearchResults]
-
-
-class QueryPlan(BaseModel):
-    queries: list[str]
-
-
-# ------------------------------------------------------------
 # 7) Final answer: ask the model to return structured JSON
 # ------------------------------------------------------------
-completion = client.beta.chat.completions.parse(
-    model=model, messages=messages, response_format=ResearchResponse, max_tokens=2000
-)
-response = completion.choices[0].message.parsed
+async def __main__():
+    queries = await generate_queries(question)
 
-# Print the final answer and source list.
-print("\nFINAL ANSWER:")
-print(response.answer)
+    response = await check_search_needed(queries)
 
-print("\nSOURCES:")
-for source in response.sources:
-    print(f"- {source.title}")
-    print(f"  {source.url}")
-    print(f"  {source.snippet}")
+    if response.tool_calls:
+        await tool_call_handler(response)
+
+        completion = client.beta.chat.completions.parse(
+            model=model,
+            messages=messages,
+            response_format=ResearchResponse,
+            max_tokens=2000,
+        )
+        response = completion.choices[0].message.parsed
+    else:
+        # model didn't request a search
+        final_response = response
+
+    # Print the final answer and source list.
+    print("\nFINAL ANSWER:")
+    print(final_response.answer)
+
+    print("\nSOURCES:")
+    for source in final_response.sources:
+        print(f"- {source.title}")
+        print(f"  {source.url}")
+        print(f"  {source.snippet}")
+
+
+if __name__ == "__main__":
+    asyncio.run(__main__)
